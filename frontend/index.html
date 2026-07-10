@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MCP Trust — Trust Facts for AI tool servers</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="masthead">
+  <a class="wordmark" href="#/" aria-label="MCP Trust home">
+    <span class="wordmark-mark">▮▮</span>
+    <span class="wordmark-text">MCP&nbsp;TRUST</span>
+    <span class="wordmark-sub">TRUST FACTS FOR AI TOOL SERVERS</span>
+  </a>
+  <nav class="mainnav" aria-label="Primary">
+    <a href="#/" data-nav="marketplace">Marketplace</a>
+    <a href="#/submit" data-nav="submit">Submit a server</a>
+  </nav>
+</header>
+
+<main id="view" tabindex="-1">
+
+  <!-- MARKETPLACE -->
+  <section id="marketplace" class="screen" aria-labelledby="mkt-h" hidden>
+    <div class="screen-head">
+      <h1 id="mkt-h">Marketplace</h1>
+      <p class="lede">Graded MCP servers. Each card is a mini trust label — tier, score, tools, flags.</p>
+    </div>
+    <div id="mkt-status" class="status" role="status" aria-live="polite"></div>
+    <div id="mkt-grid" class="grid" role="list"></div>
+  </section>
+
+  <!-- SUBMIT -->
+  <section id="submit" class="screen" aria-labelledby="sub-h" hidden>
+    <div class="screen-head">
+      <h1 id="sub-h">Submit a server</h1>
+      <p class="lede">Three ways in. You get back a Trust Facts label.</p>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Submission method">
+      <button role="tab" id="tab-url" aria-controls="panel-url" aria-selected="true" data-tab="url">Live URL</button>
+      <button role="tab" id="tab-manifest" aria-controls="panel-manifest" aria-selected="false" data-tab="manifest" tabindex="-1">Paste JSON</button>
+      <button role="tab" id="tab-repo" aria-controls="panel-repo" aria-selected="false" data-tab="repo" tabindex="-1">GitHub repo</button>
+    </div>
+
+    <form id="panel-url" class="panel" role="tabpanel" aria-labelledby="tab-url" data-endpoint="url">
+      <label for="in-url">Server URL</label>
+      <input id="in-url" name="url" type="url" inputmode="url" placeholder="https://example.com/mcp" autocomplete="off" required>
+      <p class="hint">The scanner connects live and reads the advertised tools.</p>
+      <button type="submit" class="go">Scan server</button>
+    </form>
+
+    <form id="panel-manifest" class="panel" role="tabpanel" aria-labelledby="tab-manifest" data-endpoint="manifest" hidden>
+      <label for="in-name">Server name</label>
+      <input id="in-name" name="server_name" type="text" placeholder="my-server" autocomplete="off" required>
+      <label for="in-tools">Tools JSON (array)</label>
+      <textarea id="in-tools" name="tools" rows="8" spellcheck="false" placeholder='[{"name":"read_file","description":"Read a file"}]' required></textarea>
+      <p class="hint">Paste the <code>tools</code> array from your MCP manifest.</p>
+      <button type="submit" class="go">Scan manifest</button>
+    </form>
+
+    <form id="panel-repo" class="panel" role="tabpanel" aria-labelledby="tab-repo" data-endpoint="repo" hidden>
+      <label for="in-repo">GitHub repository</label>
+      <input id="in-repo" name="repo_url" type="url" inputmode="url" placeholder="https://github.com/owner/repo" autocomplete="off" required>
+      <p class="hint">The scanner clones and inspects the server definition.</p>
+      <button type="submit" class="go">Scan repo</button>
+    </form>
+
+    <div id="scan-progress" class="scan-progress" role="status" aria-live="assertive" hidden></div>
+    <div id="submit-result"></div>
+  </section>
+
+  <!-- DETAIL -->
+  <section id="detail" class="screen" aria-labelledby="det-h" hidden>
+    <a class="back" href="#/">← Marketplace</a>
+    <h1 id="det-h" class="sr-only">Trust Facts detail</h1>
+    <div id="detail-body"></div>
+  </section>
+
+</main>
+
+<footer class="colophon">
+  <span>MCP Trust — a nutrition label for AI tool servers.</span>
+  <span id="health" class="health"></span>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
