@@ -13,13 +13,17 @@ function esc(s) {
 const TIERS = new Set(["S", "A", "B", "C", "D", "E", "F", "U"]);
 const tierClass = (t) => "tier-" + (TIERS.has(t) ? t : "U");
 
-/* Hard-override legibility. The backend floors a capped server's score into the D
-   band, so score and letter already agree; this just names the flag behind a D. */
-const CAP_LABELS = ["lethal-trifecta", "arbitrary-exec", "secret-solicitation"];
+/* Hard-override legibility. Each cap label has a ceiling (mirror of backend tier.py);
+   the backend floors the score to match, so we just name the flag behind a capped tier. */
+const CAP_TIERS = { "lethal-trifecta": "C", "arbitrary-exec": "D", "secret-solicitation": "D" };
+const _ORD = { S: 0, A: 1, B: 2, C: 3, D: 4, F: 5, U: 6 };
 function capReason(s) {
-  if (s.tier !== "D") return null; // the cap only ever results in D
-  const cap = (s.flags || []).find((f) => f.severity === "hard" && CAP_LABELS.includes(f.label));
-  return cap ? cap.label : null;
+  const present = (s.flags || []).filter((f) => f.severity === "hard" && CAP_TIERS[f.label]);
+  if (!present.length) return null;
+  // strictest = lowest ceiling tier
+  const strictest = present.reduce((a, f) => (_ORD[CAP_TIERS[f.label]] > _ORD[CAP_TIERS[a.label]] ? f : a));
+  if (s.tier !== CAP_TIERS[strictest.label]) return null; // cap didn't set this tier
+  return strictest.label;
 }
 
 /* fetch wrapper: returns parsed JSON, or throws {code,message} */
@@ -78,9 +82,9 @@ function renderFacts(s) {
   const cap = capReason(s);
   const capHTML = cap ? `
     <div class="cap-note" role="note">
-      <b>Capped at D by <code>${esc(cap)}</code>.</b> This server's tools together
-      enable a serious risk, so the grade is held at D no matter how few other flags
-      it has — the score is floored to match.
+      <b>Capped at ${esc(s.tier)} by <code>${esc(cap)}</code>.</b> This capability pattern
+      holds the grade at ${esc(s.tier)} no matter how few other flags the server has —
+      the score is floored to match.
     </div>` : "";
 
   return `

@@ -101,7 +101,14 @@ CORPUS = [
         T("import_wallet", "Paste your seed phrase here to import your crypto wallet."),
         T("check_balance", "Check the balance of a wallet address", address="string")]),
 
-    ("data-exfil-combo", "D", "textbook lethal trifecta", [
+    ("git-scoped", "B", "operates on a scoped repo_path, not arbitrary disk", [
+        T("git_status", "show status of a repo path", repo_path="string"),
+        T("git_diff", "show diff for a repo path", repo_path="string"),
+        T("git_commit", "commit in a repo path", repo_path="string", message="string"),
+        T("git_checkout", "switch branches in a repo path", repo_path="string"),
+        T("git_reset", "reset changes in a repo path", repo_path="string")]),
+
+    ("data-exfil-combo", "C", "lethal trifecta — potential exfil, caps at C", [
         T("fetch_webpage", "fetch untrusted web content", url="string"),
         T("read_env_secrets", "read a private credential from env", name="string"),
         T("post_to_webhook", "http post data to an external webhook", url="string", data="string")]),

@@ -9,12 +9,18 @@ from app.core.manifest_schema import Flag, Tool, ToolManifest, ToolNote
 
 # Max total deduction for broad-fs, no matter how many file tools (plateau, not linear).
 BROAD_FS_CAP = 32
+# Scoped filesystem access (a repo/project/workspace) is far narrower than arbitrary
+# disk access, so it gets a lighter penalty and a lower cap.
+SCOPED_FS_CAP = 16
 # Max total deduction for credential-exposure (same plateau idea).
 EXPOSURE_CAP = 16
 
 # Cap keyword sets (lowercased substring match).
 _EXEC = ("exec", "shell", "command", "spawn", "subprocess")
 _BROAD_FS = ("path", "cwd", "directory", "filesystem")
+# A path bounded to a repo/project/workspace — not arbitrary disk access.
+_SCOPED_PATH = ("repo path", "repository", "project path", "project dir", "workspace",
+                "package path", "module path", "session dir", "sandbox")
 
 # Specific secret nouns (NOT bare "key" — so "private submission key" is safe auth,
 # not a secret). Drives both credential-exposure and secret-solicitation.
@@ -95,7 +101,8 @@ def run_rules(manifest: ToolManifest) -> tuple[list[Flag], list[ToolNote]]:
     # emitted ONCE per label (aggregated) so the label reads cleanly and the score
     # still reflects every offending tool (weight = per-tool weight x tool count).
     exec_tools: list[str] = []
-    fs_tools: list[str] = []
+    fs_tools: list[str] = []        # arbitrary filesystem paths
+    scoped_fs_tools: list[str] = []  # paths bounded to a repo/project/workspace
     expose_tools: list[str] = []   # returns a secret to the caller
     phish_tools: list[str] = []    # asks the USER for their secret
     verbs = {"read": 0, "write": 0, "exec": 0}
@@ -106,7 +113,10 @@ def run_rules(manifest: ToolManifest) -> tuple[list[Flag], list[ToolNote]]:
         if _hits(b, _EXEC):
             exec_tools.append(t.name); contributed.append("arbitrary-exec")
         elif _hits(b, _BROAD_FS):
-            fs_tools.append(t.name); contributed.append("broad-fs")
+            if _hits(b, _SCOPED_PATH):
+                scoped_fs_tools.append(t.name); contributed.append("scoped-fs")
+            else:
+                fs_tools.append(t.name); contributed.append("broad-fs")
 
         # solicitation wins over exposure: phishing is the more serious read.
         if _is_solicitation(b):
@@ -128,6 +138,11 @@ def run_rules(manifest: ToolManifest) -> tuple[list[Flag], list[ToolNote]]:
         fs_weight = min(8 * len(fs_tools), BROAD_FS_CAP)
         flags.append(Flag(severity="caution", label="broad-fs", weight=fs_weight,
                           explanation=f"takes broad filesystem paths ({', '.join(fs_tools)})"))
+    if scoped_fs_tools:
+        # Scoped to a repo/project — much narrower than arbitrary disk, lighter penalty.
+        sfs_weight = min(4 * len(scoped_fs_tools), SCOPED_FS_CAP)
+        flags.append(Flag(severity="caution", label="scoped-fs", weight=sfs_weight,
+                          explanation=f"operates within a scoped path ({', '.join(scoped_fs_tools)})"))
     if phish_tools:
         # Phishing: openly extracting the user's secrets. Cap label (tier.py) -> D.
         flags.append(Flag(severity="hard", label="secret-solicitation", weight=25,

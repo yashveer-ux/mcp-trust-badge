@@ -7,14 +7,17 @@ from app.core.manifest_schema import Flag, Tier
 _THRESHOLDS: list[tuple[int, Tier]] = [(95, "S"), (85, "A"), (70, "B"),
                                        (50, "C"), (30, "D"), (0, "F")]
 
-# Labels that cap the tier at "D" no matter the score.
-HARD_CAP_LABELS = {"lethal-trifecta", "arbitrary-exec", "secret-solicitation"}
+# Labels that cap the tier, each to its own ceiling. lethal-trifecta is a *potential*
+# exfil pattern (caution) so it caps at C; unsandboxed exec and phishing are more
+# directly dangerous so they cap at D.
+CAP_TIERS = {"lethal-trifecta": "C", "arbitrary-exec": "D", "secret-solicitation": "D"}
+HARD_CAP_LABELS = set(CAP_TIERS)  # kept for callers that just need the label set
 
 _ORDER: list[Tier] = ["S", "A", "B", "C", "D", "F"]  # best -> worst, "U" is off-scale
 
-# Top of the D band (C starts at 50). When a cap fires we floor the score to here
-# so the number matches the capped letter instead of showing e.g. 85 next to a D.
-_CAP_SCORE_CEIL = 49
+# Top of each cap tier's band (score that still buckets to it), so the number matches
+# the capped letter instead of showing e.g. 85 next to a C.
+_CAP_SCORE_CEIL = {"C": 69, "D": 49}
 
 
 def bucket(score: int) -> Tier:
@@ -32,13 +35,15 @@ def compute_tier(flags: list[Flag], llm_severity_weights: list[int] | None = Non
     score = 100 - sum(f.weight for f in flags) - sum(llm_severity_weights or [])
     score = max(0, min(100, score))
     tier = bucket(score)
-    # Hard cap: pull DOWN to "D" only, never upgrade (F stays F). When the cap
-    # actually lowers the tier, also floor the score into the D band so the number
-    # and the letter agree (no more "85 / D").
-    if any(f.label in HARD_CAP_LABELS for f in flags):
-        if _ORDER.index(tier) < _ORDER.index("D"):
-            tier = "D"
-            score = min(score, _CAP_SCORE_CEIL)
+    # Hard caps pull DOWN to each label's ceiling (never upgrade). With several cap
+    # labels the strictest (lowest) ceiling wins. When a cap lowers the tier, floor
+    # the score into that band so the number and letter agree (no more "85 / D").
+    ceilings = [CAP_TIERS[f.label] for f in flags if f.label in CAP_TIERS]
+    if ceilings:
+        strictest = max(ceilings, key=_ORDER.index)  # lowest tier = highest order index
+        if _ORDER.index(tier) < _ORDER.index(strictest):
+            tier = strictest
+            score = min(score, _CAP_SCORE_CEIL[strictest])
     return (score, tier)
 
 
@@ -48,7 +53,8 @@ if __name__ == "__main__":
 
     assert compute_tier([]) == (100, "S")
     assert compute_tier([_f("secrets", 10), _f("broad-fs", 8)]) == (82, "B")
-    assert compute_tier([_f("lethal-trifecta", 5, "hard")]) == (49, "D")  # score floored to D band
+    assert compute_tier([_f("lethal-trifecta", 5, "hard")]) == (69, "C")  # trifecta caps at C
+    assert compute_tier([_f("arbitrary-exec", 5, "hard")]) == (49, "D")  # exec caps at D
     assert compute_tier([_f("arbitrary-exec", 80, "hard")]) == (20, "F")
     assert compute_tier([], scan_complete=False)[1] == "U"
     assert compute_tier([_f("secrets", 5)], [20, 10]) == (65, "C")

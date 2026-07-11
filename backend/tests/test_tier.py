@@ -20,10 +20,19 @@ def test_bucket_boundaries():
     assert bucket(150) == "S" and bucket(-5) == "F"  # clamped
 
 
-def test_hard_cap_pulls_down_to_D():
-    # score 95 would be S, but the cap label forces D — and the score is floored
-    # into the D band so the number matches the letter (no "95 / D").
-    assert compute_tier([_f("lethal-trifecta", 5, "hard")]) == (49, "D")
+def test_lethal_trifecta_caps_at_C():
+    # score 95 would be S; lethal-trifecta caps at C, score floored to the C band.
+    assert compute_tier([_f("lethal-trifecta", 5, "hard")]) == (69, "C")
+
+
+def test_exec_and_phishing_cap_at_D():
+    assert compute_tier([_f("arbitrary-exec", 5, "hard")]) == (49, "D")
+    assert compute_tier([_f("secret-solicitation", 5, "hard")]) == (49, "D")
+
+
+def test_strictest_cap_wins():
+    # trifecta (C) + exec (D) present -> the lower ceiling D wins.
+    assert compute_tier([_f("lethal-trifecta", 3, "hard"), _f("arbitrary-exec", 3, "hard")]) == (49, "D")
 
 
 def test_hard_cap_never_upgrades():
