@@ -31,6 +31,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes_badge import router as badge_router
 from app.api.routes_marketplace import router as marketplace_router
+from app.api.routes_mcp import router as mcp_router
 from app.api.routes_scan import router as scan_router
 from app.ingestion import registry_seed
 
@@ -48,6 +49,7 @@ app.add_middleware(
 app.include_router(scan_router)
 app.include_router(marketplace_router)
 app.include_router(badge_router)
+app.include_router(mcp_router)
 
 
 @app.on_event("startup")
