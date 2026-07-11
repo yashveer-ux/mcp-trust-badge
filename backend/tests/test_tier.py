@@ -21,8 +21,9 @@ def test_bucket_boundaries():
 
 
 def test_hard_cap_pulls_down_to_D():
-    # score 95 would be S, but the cap label forces D.
-    assert compute_tier([_f("lethal-trifecta", 5, "hard")]) == (95, "D")
+    # score 95 would be S, but the cap label forces D — and the score is floored
+    # into the D band so the number matches the letter (no "95 / D").
+    assert compute_tier([_f("lethal-trifecta", 5, "hard")]) == (49, "D")
 
 
 def test_hard_cap_never_upgrades():
