@@ -16,6 +16,18 @@ from app.mcp_server import _handle
 router = APIRouter()
 
 
+@router.get("/mcp")
+def mcp_info() -> dict:
+    """Friendly response for a browser GET (the protocol itself is POST-only)."""
+    return {
+        "server": "mcp-trust-badge",
+        "transport": "streamable-http",
+        "note": "This is an MCP endpoint. Send JSON-RPC 2.0 over POST, not GET.",
+        "tools": ["grade_manifest", "grade_server_url"],
+        "example": "POST /mcp {\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}",
+    }
+
+
 @router.post("/mcp")
 async def mcp_endpoint(request: Request) -> Response:
     try:
