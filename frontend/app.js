@@ -13,6 +13,15 @@ function esc(s) {
 const TIERS = new Set(["S", "A", "B", "C", "D", "E", "F", "U"]);
 const tierClass = (t) => "tier-" + (TIERS.has(t) ? t : "U");
 
+/* Hard-override legibility. The backend floors a capped server's score into the D
+   band, so score and letter already agree; this just names the flag behind a D. */
+const CAP_LABELS = ["lethal-trifecta", "arbitrary-exec", "secret-solicitation"];
+function capReason(s) {
+  if (s.tier !== "D") return null; // the cap only ever results in D
+  const cap = (s.flags || []).find((f) => f.severity === "hard" && CAP_LABELS.includes(f.label));
+  return cap ? cap.label : null;
+}
+
 /* fetch wrapper: returns parsed JSON, or throws {code,message} */
 async function api(path, opts) {
   let res;
@@ -66,6 +75,13 @@ function renderFacts(s) {
     : `<p class="flag-none">No tools reported.</p>`;
 
   const scoreNum = (typeof s.score === "number") ? s.score : "—";
+  const cap = capReason(s);
+  const capHTML = cap ? `
+    <div class="cap-note" role="note">
+      <b>Capped at D by <code>${esc(cap)}</code>.</b> This server's tools together
+      enable a serious risk, so the grade is held at D no matter how few other flags
+      it has — the score is floored to match.
+    </div>` : "";
 
   return `
   <div class="facts">
@@ -81,6 +97,7 @@ function renderFacts(s) {
         <span class="num">${esc(scoreNum)}</span><span class="den"> / 100</span>
       </div>
     </div>
+    ${capHTML}
 
     <div class="rule thick"></div>
     <div class="facts-section-h">Flags</div>
@@ -116,11 +133,13 @@ function renderCard(s) {
       <div class="card-score">
         <span class="num">${esc(typeof s.score === "number" ? s.score : "—")}</span>
         <span class="den">/ 100</span>
+        ${capReason(s) ? `<span class="capped-tag" title="Capped by ${esc(capReason(s))}">▼ capped at ${esc(s.tier)}</span>` : ""}
       </div>
       <div class="card-flags">
         <span><b>${esc(toolCount)}</b> tools</span>
         <span><b>${esc(caution)}</b> caution</span>
         <span><b>${esc(hard)}</b> hard</span>
+        <button class="card-del" data-id="${esc(id)}" title="Remove from marketplace" aria-label="Remove ${esc(s.server_name)}">✕</button>
       </div>
     </a>`;
 }
@@ -140,10 +159,37 @@ async function loadMarketplace() {
       return;
     }
     grid.innerHTML = servers.map(renderCard).join("");
+    wireDelete(grid, status);
   } catch (e) {
     status.textContent = "";
     grid.innerHTML = backendDown(e);
   }
+}
+
+/* per-card remove: two-step inline confirm (no native dialog) */
+function wireDelete(grid, status) {
+  grid.querySelectorAll(".card-del").forEach((btn) => {
+    btn.addEventListener("click", async (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation(); // don't navigate into the card's detail link
+      if (btn.dataset.armed !== "1") {
+        btn.dataset.armed = "1";
+        btn.textContent = "remove?";
+        btn.classList.add("armed");
+        setTimeout(() => {
+          if (btn.isConnected) { btn.dataset.armed = "0"; btn.textContent = "✕"; btn.classList.remove("armed"); }
+        }, 3000);
+        return;
+      }
+      try { await api("/marketplace/" + encodeURIComponent(btn.dataset.id), { method: "DELETE" }); }
+      catch (e) { btn.textContent = "failed"; return; }
+      const card = btn.closest(".card");
+      if (card) card.remove();
+      const n = grid.querySelectorAll(".card").length;
+      if (status) status.textContent = n ? `${n} servers graded` : "";
+      if (!n) grid.innerHTML = `<div class="empty"><h2>No servers yet</h2><p>Submit one to see its Trust Facts label.</p></div>`;
+    });
+  });
 }
 
 function backendDown(e) {
@@ -156,14 +202,51 @@ function backendDown(e) {
   return `<div class="err"><h2>Could not load</h2><p>${esc(e.message)}</p><code>${esc(e.code)}</code></div>`;
 }
 
+/* ---------- embeddable badge ---------- */
+function renderEmbed(s) {
+  const id = s.scan_id || "";
+  const badge = `${API_BASE}/badge/${encodeURIComponent(id)}.svg`;
+  const page = `${location.origin}${location.pathname}#/server/${encodeURIComponent(id)}`;
+  const md = `[![MCP Trust](${badge})](${page})`;
+  const html = `<a href="${page}"><img src="${badge}" alt="MCP Trust: tier ${s.tier}"></a>`;
+  return `
+    <section class="embed" aria-label="Embed badge">
+      <h3>Embed this badge</h3>
+      <p class="embed-hint">Drop it in a README or on your site — it always shows this server's current grade.</p>
+      <img class="embed-preview" src="${esc(badge)}" alt="Trust badge preview" width="132" height="20">
+      <div class="embed-field">
+        <span class="embed-label">Markdown</span>
+        <code id="snip-md">${esc(md)}</code>
+        <button class="copy" data-copy="snip-md">Copy</button>
+      </div>
+      <div class="embed-field">
+        <span class="embed-label">HTML</span>
+        <code id="snip-html">${esc(html)}</code>
+        <button class="copy" data-copy="snip-html">Copy</button>
+      </div>
+    </section>`;
+}
+
+function wireCopy(root) {
+  root.querySelectorAll("[data-copy]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const text = el(btn.dataset.copy).textContent;
+      try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+      catch { btn.textContent = "Copy failed"; }
+      setTimeout(() => { btn.textContent = "Copy"; }, 1500);
+    });
+  });
+}
+
 /* ---------- detail screen ---------- */
 async function loadDetail(id) {
   const body = el("detail-body");
   body.innerHTML = `<p class="status">Loading…</p>`;
   try {
     const s = await fetchServer(id);
-    body.innerHTML = renderFacts(s) +
+    body.innerHTML = renderFacts(s) + renderEmbed(s) +
       `<div class="detail-actions"><button class="go" id="rescan">Re-scan</button></div>`;
+    wireCopy(body);
     $("#rescan").addEventListener("click", async (ev) => {
       ev.target.disabled = true;
       ev.target.textContent = "Re-scanning…";
