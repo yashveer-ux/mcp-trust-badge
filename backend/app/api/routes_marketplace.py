@@ -21,3 +21,11 @@ def marketplace_server(server_id: str) -> ScanResult:
         raise HTTPException(404, detail={"code": "server_not_found",
                                          "message": f"No server {server_id}"})
     return result
+
+
+@router.delete("/marketplace/{server_id}")
+def delete_server(server_id: str) -> dict:
+    if not store.delete(server_id):
+        raise HTTPException(404, detail={"code": "server_not_found",
+                                         "message": f"No server {server_id}"})
+    return {"deleted": server_id}

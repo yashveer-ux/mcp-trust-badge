@@ -2,12 +2,34 @@
 from __future__ import annotations
 
 import logging
+import os
+import pathlib
+
+
+def _load_env() -> None:
+    """Load KEY=VALUE lines from a gitignored .env (backend/ or cwd) into the
+    process environment. No dependency; existing env vars win over the file."""
+    here = pathlib.Path(__file__).resolve()
+    for env in (here.parents[1] / ".env", pathlib.Path.cwd() / ".env"):
+        if not env.exists():
+            continue
+        for line in env.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+        break
+
+
+_load_env()
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.routes_badge import router as badge_router
 from app.api.routes_marketplace import router as marketplace_router
 from app.api.routes_scan import router as scan_router
 from app.ingestion import registry_seed
@@ -25,6 +47,7 @@ app.add_middleware(
 
 app.include_router(scan_router)
 app.include_router(marketplace_router)
+app.include_router(badge_router)
 
 
 @app.on_event("startup")

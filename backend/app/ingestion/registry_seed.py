@@ -105,9 +105,10 @@ def _seed_registry(limit: int = 5) -> int:
 
 
 def seed() -> int:
-    for m in _SEED_MANIFESTS:
+    from app.ingestion.known_servers import KNOWN_SERVERS
+    for m in _SEED_MANIFESTS + KNOWN_SERVERS:
         _store_manifest(m)
-    n = len(_SEED_MANIFESTS)
+    n = len(_SEED_MANIFESTS) + len(KNOWN_SERVERS)
     n += _seed_registry()
     return n
 

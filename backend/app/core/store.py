@@ -53,3 +53,11 @@ def list_all() -> list[ScanResult]:
     with _conn() as c:
         rows = c.execute("SELECT data FROM scans").fetchall()
     return [ScanResult.model_validate_json(r[0]) for r in rows]
+
+
+def delete(scan_id: str) -> bool:
+    """Remove a scan. Returns True if a row was deleted.
+    Note: seeded servers reappear on next startup (seed is idempotent)."""
+    with _conn() as c:
+        cur = c.execute("DELETE FROM scans WHERE scan_id=?", (scan_id,))
+        return cur.rowcount > 0
