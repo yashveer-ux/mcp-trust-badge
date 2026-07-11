@@ -1,0 +1,10 @@
+{
+  "_comment": "Add MCP Trust Badge as an MCP server. For Claude Desktop, merge this into claude_desktop_config.json (macOS: ~/Library/Application Support/Claude/). Then an assistant can grade a server before trusting it.",
+  "mcpServers": {
+    "mcp-trust-badge": {
+      "command": "/Users/yashveersookun/mcp-trust-badge/backend/.venv/bin/python",
+      "args": ["-m", "app.mcp_server"],
+      "cwd": "/Users/yashveersookun/mcp-trust-badge/backend"
+    }
+  }
+}
